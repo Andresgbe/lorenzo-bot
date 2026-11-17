@@ -59,3 +59,18 @@ Quien paga en el bot recibe también acceso completo a la plataforma web de Lore
 - El plan anual cuesta ahora **277.77 USDT** (antes 297). El mensual sigue en 27.77.
 - El ahorro del anual frente a 12 meses pasa a **~55 USDT** (333.24 − 277.77 = 55.47); el bot lo calcula solo.
 - Código: `bot.py` (`PLANS`) y el ejemplo de `.env.example`. Si en el servidor existe la variable `PRICE_ANUAL`, manda sobre este valor.
+
+## Menú y mensajes más claros (17/11/2026)
+
+- **`/start`** ahora avisa que existe `/menu` (y el botón «Menú» junto al teclado) y que «🆘 Ayuda» resuelve las dudas.
+- **Menú principal:** nuevos botones **«🧾 Comprobar mi pago»** y **«🆘 Ayuda»** (reemplaza a «Preguntas»).
+- **Comprobar mi pago** (`/pago` o el botón): consulta Crypto Pay al momento, sin esperar los 20 s del revisor automático, y dice en qué estado está:
+  - pagado ahora (activa la membresía y manda el acceso),
+  - pendiente (con el botón para pagar),
+  - factura vencida (sin cobro, con los planes para elegir otra vez),
+  - membresía ya activa, o sin pagos recientes.
+  Tiene un límite de un toque cada 8 segundos por persona.
+- **Ayuda guiada** (`/ayuda`): pantalla «¿En qué te ayudo?» con un botón por situación (suscribirme, ya pagué, no me llegó el acceso, cuánto me queda, preguntas, soporte). Las preguntas frecuentes siguen debajo y vuelven a la ayuda.
+- El texto de «Ya pagué y no me llegó el acceso» menciona el botón nuevo, y el mensaje de «No entendí» es más amable.
+- `/pago` se añade a la lista de comandos del botón «Menú» y `/ayuda` pasa a llamarse «Ayuda: ¿qué hago?».
+- No hay cambios en la base de datos ni variables nuevas.

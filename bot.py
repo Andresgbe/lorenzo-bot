@@ -129,7 +129,9 @@ TEXT_START = (
     "<b>Elige tu plan</b> (pago en {asset} con Crypto Pay):\n"
     "• Mensual: <b>{mensual} {asset}</b>\n"
     "• Anual: <b>{anual} {asset}</b>{ahorro}\n\n"
-    "Abajo también puedes ver tu membresía y resolver tus dudas. 👇"
+    "👇 Elige una opción abajo.\n\n"
+    "💡 <b>Tip:</b> puedes usar el comando /menu siempre que quieras para volver a este menú "
+    "(también está en el botón «Menú» junto al teclado). Si no sabes qué hacer, toca «🆘 Ayuda»."
 )
 
 TEXT_WELCOME = (
@@ -233,6 +235,7 @@ def faq_items() -> list[tuple[str, str]]:
         (
             "Ya pagué y no me llegó el acceso",
             "El pago se confirma en menos de un minuto. Si ya pasaron unos minutos:\n"
+            "• Toca «🧾 Comprobar mi pago» en el menú (o escribe /pago): reviso tu pago al momento.\n"
             "• Revisa en @CryptoBot que el pago aparezca como completado.\n"
             "• La factura vence 1 hora después de creada: si se venció, elige el plan otra vez.\n"
             "• Escribe /estado para ver si tu membresía ya está activa."
@@ -421,10 +424,12 @@ def screen_menu(user) -> tuple[str, InlineKeyboardMarkup]:
     rows = plan_rows()
     rows.append([
         InlineKeyboardButton("👤 Mi membresía", callback_data="nav:cuenta"),
-        InlineKeyboardButton("❓ Preguntas", callback_data="nav:faq"),
+        InlineKeyboardButton("🧾 Comprobar mi pago", callback_data="chk:pago"),
     ])
+    last_row = [InlineKeyboardButton("🆘 Ayuda", callback_data="nav:ayuda")]
     if is_active(member):
-        rows.append([InlineKeyboardButton("🔑 Mis accesos", callback_data="nav:accesos")])
+        last_row.insert(0, InlineKeyboardButton("🔑 Mis accesos", callback_data="nav:accesos"))
+    rows.append(last_row)
     if SUPPORT_URL:
         rows.append([InlineKeyboardButton("💬 Hablar con soporte", url=SUPPORT_URL)])
     return text, InlineKeyboardMarkup(rows)
@@ -477,6 +482,26 @@ def screen_accesos(user) -> tuple[str, InlineKeyboardMarkup]:
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
+def screen_ayuda(user) -> tuple[str, InlineKeyboardMarkup]:
+    """Ayuda guiada: «¿qué necesitas?», con un botón por cada situación común."""
+    rows = [
+        [InlineKeyboardButton("🛒 Quiero suscribirme", callback_data="nav:faq:2")],
+        [InlineKeyboardButton("🧾 Ya pagué: comprobar mi pago", callback_data="chk:pago")],
+        [InlineKeyboardButton("🔑 No me llegó el acceso / mi link no sirve", callback_data="nav:accesos")],
+        [InlineKeyboardButton("👤 Ver cuánto me queda de membresía", callback_data="nav:cuenta")],
+        [InlineKeyboardButton("❓ Ver todas las preguntas", callback_data="nav:faq")],
+    ]
+    if SUPPORT_URL:
+        rows.append([InlineKeyboardButton("💬 Hablar con una persona", url=SUPPORT_URL)])
+    rows.append([btn_menu()])
+    return (
+        "🆘 <b>¿En qué te ayudo?</b>\n\n"
+        "Elige lo que necesitas y te guío paso a paso. "
+        "Puedes volver aquí cuando quieras con /ayuda.",
+        InlineKeyboardMarkup(rows),
+    )
+
+
 def screen_faq(user) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         [InlineKeyboardButton(q, callback_data=f"nav:faq:{i}")]
@@ -484,6 +509,7 @@ def screen_faq(user) -> tuple[str, InlineKeyboardMarkup]:
     ]
     if SUPPORT_URL:
         rows.append([InlineKeyboardButton("💬 Hablar con soporte", url=SUPPORT_URL)])
+    rows.append([InlineKeyboardButton("⬅️ Volver a la ayuda", callback_data="nav:ayuda")])
     rows.append([btn_menu()])
     return "❓ <b>Preguntas frecuentes</b>\n\nToca una pregunta para ver la respuesta:", InlineKeyboardMarkup(rows)
 
@@ -507,6 +533,8 @@ def build_screen(user, name: str) -> tuple[str, InlineKeyboardMarkup] | None:
         return screen_cuenta(user)
     if name == "accesos":
         return screen_accesos(user)
+    if name == "ayuda":
+        return screen_ayuda(user)
     if name == "faq":
         return screen_faq(user)
     if name.startswith("faq:") and name[4:].isdigit():
@@ -768,7 +796,112 @@ async def cmd_ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         return
     save_user(update.effective_user)
-    await send_screen(context.bot, update.effective_user, "faq")
+    await send_screen(context.bot, update.effective_user, "ayuda")
+
+
+async def check_my_payment(context: ContextTypes.DEFAULT_TYPE, user):
+    """Revisa ahora mismo en Crypto Pay los pagos pendientes de la persona y le cuenta cómo van."""
+    bot = context.bot
+    last = context.user_data.get("check_pago_at")
+    if last and (now() - last).total_seconds() < 8:
+        await bot.send_message(
+            user.id, "Acabo de revisar tu pago hace un momento. Espera unos segundos y vuelve a intentar. ⏳"
+        )
+        return
+    context.user_data["check_pago_at"] = now()
+
+    pending = db.execute(
+        "SELECT * FROM payments WHERE user_id=? AND method='cryptopay' AND status='pendiente' "
+        "ORDER BY created_at",
+        (user.id,),
+    ).fetchall()
+    just_paid = False
+    if pending:
+        await check_invoice_chunk(context, pending)  # si ya se pagó, activa la membresía
+        refs = [r["ref"] for r in pending]
+        marks = ",".join("?" for _ in refs)
+        just_paid = bool(
+            db.execute(
+                f"SELECT 1 FROM payments WHERE ref IN ({marks}) AND status='pagado' LIMIT 1", refs
+            ).fetchone()
+        )
+
+    member = get_member(user.id)
+    recent = db.execute(
+        "SELECT * FROM payments WHERE user_id=? AND method='cryptopay' AND created_at>? "
+        "ORDER BY created_at DESC LIMIT 1",
+        (user.id, iso(now() - timedelta(hours=24))),
+    ).fetchone()
+    nav_rows = [[InlineKeyboardButton("🆘 Más ayuda", callback_data="go:ayuda")], [btn_menu(edit=False)]]
+
+    if just_paid:
+        await bot.send_message(
+            user.id,
+            "✅ <b>¡Tu pago acaba de confirmarse!</b>\n\nTe envié tu bienvenida y tu acceso en el "
+            "mensaje de arriba. Si no lo ves, toca «🔑 Mis accesos».",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🔑 Mis accesos", callback_data="go:accesos")], [btn_menu(edit=False)]]
+            ),
+        )
+    elif recent and recent["status"] == "pendiente":
+        rows = []
+        if recent["pay_url"]:
+            rows.append([InlineKeyboardButton("💳 Ir a pagar", url=recent["pay_url"])])
+        rows += nav_rows
+        await bot.send_message(
+            user.id,
+            "⏳ <b>Todavía no veo tu pago.</b>\n\n"
+            "• Si <b>ya pagaste</b>, espera un minuto y toca «🧾 Comprobar mi pago» otra vez.\n"
+            "• Si <b>aún no pagas</b>, toca «Ir a pagar». La factura vence 1 hora después de creada.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(rows),
+        )
+    elif is_active(member):
+        exp = parse(member["expires_at"])
+        await bot.send_message(
+            user.id,
+            f"✅ <b>Tu membresía está activa</b> hasta el <b>{fecha(exp)}</b>.\n\n"
+            "Si no te llegó algún acceso, tócalo aquí:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🔑 Mis accesos", callback_data="go:accesos")], [btn_menu(edit=False)]]
+            ),
+        )
+    elif recent and recent["status"] == "expirado":
+        await bot.send_message(
+            user.id,
+            "⌛ <b>Tu factura venció sin pagarse.</b>\n\nNo se te cobró nada. Elige tu plan para "
+            "generar una nueva:",
+            parse_mode="HTML",
+            reply_markup=plans_keyboard(),
+        )
+    else:
+        await bot.send_message(
+            user.id,
+            "🔎 <b>No encuentro pagos recientes tuyos.</b>\n\nSi pagaste hace más de un día o con otra "
+            "cuenta de Telegram, escríbele a soporte. Si todavía no pagas, elige tu plan:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(
+                plan_rows()
+                + ([[InlineKeyboardButton("💬 Hablar con soporte", url=SUPPORT_URL)]] if SUPPORT_URL else [])
+                + [[btn_menu(edit=False)]]
+            ),
+        )
+
+
+async def cmd_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    save_user(update.effective_user)
+    await check_my_payment(context, update.effective_user)
+
+
+async def on_check_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer("Revisando tu pago…")
+    save_user(query.from_user)
+    await check_my_payment(context, query.from_user)
 
 
 async def on_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1021,7 +1154,10 @@ async def on_private_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_user(user)
     u = get_user(user.id)
     if not WEB_ENABLED or not u or not u["awaiting_email"]:
-        await update.message.reply_text("No entendí ese mensaje. Aquí tienes el menú 👇")
+        await update.message.reply_text(
+            "No entendí ese mensaje 🤔 Soy un bot y entiendo los botones. "
+            "Aquí tienes el menú; si no sabes qué hacer, toca «🆘 Ayuda» 👇"
+        )
         await send_screen(context.bot, user, "menu")
         return
     email = update.message.text.strip().lower()
@@ -1625,12 +1761,13 @@ async def post_init(app: Application):
     """Lista de comandos que Telegram muestra en el botón «Menú» del chat."""
     user_cmds = [
         BotCommand("menu", "Menú principal"),
+        BotCommand("pago", "Comprobar mi pago"),
         BotCommand("estado", "Ver mi membresía"),
         BotCommand("acceso", "Link nuevo al canal"),
     ]
     if WEB_ENABLED:
         user_cmds.append(BotCommand("web", "Entrar a los cursos"))
-    user_cmds.append(BotCommand("ayuda", "Preguntas frecuentes"))
+    user_cmds.append(BotCommand("ayuda", "Ayuda: ¿qué hago?"))
     admin_cmds = user_cmds + [
         BotCommand("admin", "Comandos de administrador"),
         BotCommand("miembros", "Resumen de miembros"),
@@ -1656,10 +1793,12 @@ def main():
     app.add_handler(CommandHandler("menu", cmd_menu))
     app.add_handler(CommandHandler("ayuda", cmd_ayuda))
     app.add_handler(CommandHandler("estado", cmd_estado))
+    app.add_handler(CommandHandler("pago", cmd_pago))
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("acceso", cmd_acceso))
     app.add_handler(CommandHandler("web", cmd_web))
     app.add_handler(CallbackQueryHandler(on_email_choice, pattern=r"^email:"))
+    app.add_handler(CallbackQueryHandler(on_check_payment, pattern=r"^chk:"))
     app.add_handler(CallbackQueryHandler(on_nav, pattern=r"^(nav|go):"))
     app.add_handler(CallbackQueryHandler(on_access_button, pattern=r"^acc:"))
     app.add_handler(CallbackQueryHandler(on_broadcast_choice, pattern=r"^bc:"))
