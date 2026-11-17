@@ -53,3 +53,9 @@ Quien paga en el bot recibe también acceso completo a la plataforma web de Lore
 - **Nuevo `/difundir`** (admin): manda un aviso a los miembros activos o a todos los que iniciaron el bot, y pregunta antes de enviar. Se puede escribir el texto o responder a cualquier mensaje (foto, video, formato) con `/difundir`. Al terminar avisa cuántos se entregaron.
 - `/acceso` ya no se cae si Telegram no deja crear el link: le avisa al miembro y a los admins.
 - No hay cambios en la base de datos.
+
+## Precio del plan anual: 277.77 USDT (17/11/2026)
+
+- El plan anual cuesta ahora **277.77 USDT** (antes 297). El mensual sigue en 27.77.
+- El ahorro del anual frente a 12 meses pasa a **~55 USDT** (333.24 − 277.77 = 55.47); el bot lo calcula solo.
+- Código: `bot.py` (`PLANS`) y el ejemplo de `.env.example`. Si en el servidor existe la variable `PRICE_ANUAL`, manda sobre este valor.

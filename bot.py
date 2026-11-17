@@ -100,9 +100,9 @@ def price_from_env(name: str, default: str) -> str:
 
 PLANS = {
     "mensual": {"name": "Mensual", "amount": price_from_env("PRICE_MENSUAL", "27.77"), "days": 30},
-    "anual": {"name": "Anual", "amount": price_from_env("PRICE_ANUAL", "297"), "days": 365},
+    "anual": {"name": "Anual", "amount": price_from_env("PRICE_ANUAL", "277.77"), "days": 365},
 }
-# Lo que se ahorra el anual frente a 12 meses, redondeado: "~36" con 27.77 y 297.
+# Lo que se ahorra el anual frente a 12 meses, redondeado: "~55" con 27.77 y 277.77.
 ANNUAL_SAVINGS = (
     Decimal(PLANS["mensual"]["amount"]) * 12 - Decimal(PLANS["anual"]["amount"])
 ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
