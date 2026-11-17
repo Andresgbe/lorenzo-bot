@@ -74,3 +74,9 @@ Quien paga en el bot recibe también acceso completo a la plataforma web de Lore
 - El texto de «Ya pagué y no me llegó el acceso» menciona el botón nuevo, y el mensaje de «No entendí» es más amable.
 - `/pago` se añade a la lista de comandos del botón «Menú» y `/ayuda` pasa a llamarse «Ayuda: ¿qué hago?».
 - No hay cambios en la base de datos ni variables nuevas.
+
+## Teléfono de consultas (17/11/2026)
+
+- El bot muestra **+1 (551) 332-0026** como teléfono para consultas y dudas, al final del menú principal, de la ayuda, de las preguntas frecuentes (y sus respuestas) y del aviso «No encuentro pagos recientes».
+- Es el valor por defecto de `SUPPORT_PHONE` en `bot.py`. Para cambiarlo sin tocar el código, pon la variable `SUPPORT_PHONE` en Railway; si la dejas vacía, el teléfono deja de mostrarse.
+- Telegram convierte el número en un enlace tocable, pero no se puede poner en un botón: va como texto del mensaje.

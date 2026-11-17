@@ -72,6 +72,9 @@ WEB_ENABLED = bool(WEB_ACCESS_URL and WEB_ACCESS_SECRET)
 # Soporte: link para escribirle al equipo (por ejemplo https://t.me/usuario).
 COMMUNITY_URL = os.getenv("COMMUNITY_URL", "").strip()
 SUPPORT_URL = os.getenv("SUPPORT_URL", "").strip()
+# Teléfono para consultas y dudas, visible en el menú y la ayuda. Se puede cambiar con la variable
+# SUPPORT_PHONE (en Railway); vacía, deja de mostrarse.
+SUPPORT_PHONE = os.getenv("SUPPORT_PHONE", "+1 (551) 332-0026").strip()
 for _name, _url in (("COMMUNITY_URL", COMMUNITY_URL), ("SUPPORT_URL", SUPPORT_URL)):
     if _url and not _url.startswith("https://"):
         raise SystemExit(f"{_name} debe ser un link que empiece con https://, por ejemplo https://t.me/...")
@@ -198,6 +201,13 @@ TEXT_COMMUNITY = (
 )
 
 
+def phone_line() -> str:
+    """Aviso del teléfono de consultas, para añadir al final de un mensaje."""
+    if not SUPPORT_PHONE:
+        return ""
+    return f"\n\n📞 ¿Tienes una consulta o duda? Escríbenos al <b>{html.escape(SUPPORT_PHONE)}</b>."
+
+
 def faq_items() -> list[tuple[str, str]]:
     """Preguntas frecuentes del menú: (pregunta, respuesta en HTML). Se editan aquí.
 
@@ -207,7 +217,7 @@ def faq_items() -> list[tuple[str, str]]:
         "\n\nSi sigue sin llegar, toca «💬 Hablar con soporte»."
         if SUPPORT_URL
         else "\n\nSi sigue sin llegar, escríbele al equipo de Lorenzo Broker."
-    )
+    ) + phone_line()
     items = [
         (
             "¿Qué incluye la membresía?",
@@ -421,6 +431,7 @@ def screen_menu(user) -> tuple[str, InlineKeyboardMarkup]:
             f"\n\n⚠️ Tu membresía venció el <b>{fecha(exp)}</b>. Renueva antes del "
             f"<b>{fecha(exp + timedelta(days=GRACE_DAYS))}</b> para no salir del canal."
         )
+    text += phone_line()
     rows = plan_rows()
     rows.append([
         InlineKeyboardButton("👤 Mi membresía", callback_data="nav:cuenta"),
@@ -497,7 +508,7 @@ def screen_ayuda(user) -> tuple[str, InlineKeyboardMarkup]:
     return (
         "🆘 <b>¿En qué te ayudo?</b>\n\n"
         "Elige lo que necesitas y te guío paso a paso. "
-        "Puedes volver aquí cuando quieras con /ayuda.",
+        "Puedes volver aquí cuando quieras con /ayuda." + phone_line(),
         InlineKeyboardMarkup(rows),
     )
 
@@ -511,7 +522,10 @@ def screen_faq(user) -> tuple[str, InlineKeyboardMarkup]:
         rows.append([InlineKeyboardButton("💬 Hablar con soporte", url=SUPPORT_URL)])
     rows.append([InlineKeyboardButton("⬅️ Volver a la ayuda", callback_data="nav:ayuda")])
     rows.append([btn_menu()])
-    return "❓ <b>Preguntas frecuentes</b>\n\nToca una pregunta para ver la respuesta:", InlineKeyboardMarkup(rows)
+    return (
+        "❓ <b>Preguntas frecuentes</b>\n\nToca una pregunta para ver la respuesta:" + phone_line(),
+        InlineKeyboardMarkup(rows),
+    )
 
 
 def screen_faq_answer(index: int) -> tuple[str, InlineKeyboardMarkup] | None:
@@ -880,7 +894,7 @@ async def check_my_payment(context: ContextTypes.DEFAULT_TYPE, user):
         await bot.send_message(
             user.id,
             "🔎 <b>No encuentro pagos recientes tuyos.</b>\n\nSi pagaste hace más de un día o con otra "
-            "cuenta de Telegram, escríbele a soporte. Si todavía no pagas, elige tu plan:",
+            "cuenta de Telegram, escríbele a soporte. Si todavía no pagas, elige tu plan:" + phone_line(),
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(
                 plan_rows()
