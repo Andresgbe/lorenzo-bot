@@ -69,6 +69,8 @@ Railway mantiene el bot encendido 24/7. Cuesta aprox. **$5 al mes** (verifica el
 | `ADMIN_IDS` | Tu ID de Telegram (ver Paso 6) |
 | `CHANNEL_ID` | El ID del canal (ver Paso 6) |
 | `DB_PATH` | `/data/bot.db` |
+| `COMMUNITY_URL` | *(Opcional)* Link al grupo de la comunidad en Telegram (`https://t.me/...`). Se entrega solo a quien paga. |
+| `SUPPORT_URL` | *(Opcional)* Link para escribirle a soporte, por ejemplo `https://t.me/tu_usuario`. Aparece en el menú y en las preguntas frecuentes. |
 
 4. Agrega un **Volume** (disco donde se guarda la lista de miembros): en el proyecto, botón **+ New** → **Volume** → conéctalo al servicio del bot con la ruta de montaje `/data`.
    ⚠️ Sin este paso, la lista de miembros se borraría cada vez que el servidor se reinicie.
@@ -130,7 +132,8 @@ Para Instagram (link en la bio): `https://t.me/LorenzoBrokerBot?start=instagram`
 
 ## Cómo funciona el día a día
 
-- **Alguien paga** → recibe la bienvenida y un link de un solo uso (vence en 24 h); tú recibes un aviso.
+- **Menú** → con `/start` o `/menu` se abre el menú: planes, "Mi membresía", "Preguntas frecuentes", "Mis accesos" (solo miembros) y soporte. Cada pantalla y cada mensaje del bot tiene un botón para volver al menú. Si alguien escribe algo que el bot no entiende, le responde con el menú.
+- **Alguien paga** → recibe la bienvenida, un link de un solo uso al canal (vence en 24 h) y, si `COMMUNITY_URL` está configurada, el botón a la comunidad de Telegram; tú recibes un aviso.
 - **Se le venció el link sin usarlo** → escribe `/acceso` al bot y recibe uno nuevo.
 - **Alguien entra sin membresía** (link ajeno o agregado a mano) → el bot lo saca al instante y te avisa.
 - **3 días antes de vencer** → el bot le recuerda que renueve.
@@ -138,6 +141,7 @@ Para Instagram (link en la bio): `https://t.me/LorenzoBrokerBot?start=instagram`
 - **Pasan los 3 días** → el bot lo saca del canal y te avisa. Si paga después, entra de nuevo con un link nuevo.
 - **Renueva antes de vencer** → los días se suman a su fecha actual.
 - **Los administradores del canal nunca son expulsados.**
+- **Acceso a la web** (si `WEB_ACCESS_URL` y `WEB_ACCESS_SECRET` están configuradas): después de pagar, el bot pide el correo y entrega un botón "Entrar a tus cursos". Con `/web` el miembro pide un enlace nuevo.
 
 ### Comandos de administrador
 | Comando | Qué hace |
@@ -150,6 +154,8 @@ Para Instagram (link en la bio): `https://t.me/LorenzoBrokerBot?start=instagram`
 | `/exportar` | Descarga la lista en un archivo que abre Excel o Google Sheets |
 | `/sacar @usuario` | Lo saca del canal en el momento |
 | `/probar` | Verifica la conexión con el canal y con Crypto Pay |
+| `/saldo` | Saldo de la app de Crypto Pay (lo cobrado que aún no pasaste a tu Wallet) |
+| `/difundir texto` | Manda un aviso a los miembros activos o a todos los que iniciaron el bot (te pregunta antes de enviar). También puedes responder a cualquier mensaje (foto, video, texto con formato) con `/difundir` |
 | `/forzar_vencimiento @usuario` | **Solo para pruebas:** simula que se le venció |
 
 ### Miembros que ya están en el canal antes del lanzamiento
